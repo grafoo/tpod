@@ -24,3 +24,9 @@ sudo apt-get install \
     libcurl4-nss-dev
     libmpg123-dev \
     make \
+
+# todo
+- checkout mongoose as webserver
+ - void linux package: mongoose-devel
+- checkout libmrss as rss feed parser
+ - void linux package: libmrss-devel
