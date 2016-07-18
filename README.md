@@ -5,6 +5,7 @@ a tiny podcast fetcher/player
 - libao
 - libcurl
 - mpg123
+- mongoose-6.5
 
 ## toolchain
 stuff needed to build tpod
