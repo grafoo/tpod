@@ -10,7 +10,8 @@ static struct mg_serve_http_opts s_http_server_opts;
 mpg123_handle *mh = NULL;
 ao_device *device = NULL;
 int stop = 0;
-struct mg_mgr mgr;
+int srv = 1;
+int mode = 0; // 0 = server; 1 = command line
 
 size_t write_callback(char *delivered_data, size_t size, size_t nmemb, void *user_data) {
     int err;
@@ -122,7 +123,7 @@ static void ev_handler(struct mg_connection *con, int ev, void *ev_data) {
 
 void cleanup() {
     //if(mh) {
-    //    ao_close(device);
+        ao_close(device);
     //}
     ao_shutdown();
     mpg123_exit();
@@ -130,14 +131,20 @@ void cleanup() {
 
 void signal_handler(int s) {
     if(s == SIGINT) {
-        stop = 1;
-        //mg_mgr_free(&mgr);
-        cleanup();
-        exit(130);
+        switch(mode) {
+            case 0:
+                srv = 0;
+                break;
+            case 1:
+                stop = 1;
+                cleanup();
+                exit(130);
+                break;
+            default:
+                break;
+        }
     }
 }
-
-
 
 int main(int argc, char **argv) {
     signal(SIGINT, signal_handler);
@@ -146,7 +153,7 @@ int main(int argc, char **argv) {
     ao_initialize();
 
     if(strcmp("-s", argv[1]) == 0) {
-        //struct mg_mgr mgr;
+        struct mg_mgr mgr;
         struct mg_connection *con;
 
         mg_mgr_init(&mgr, NULL);
@@ -155,13 +162,16 @@ int main(int argc, char **argv) {
         mg_enable_multithreading(con);
         s_http_server_opts.document_root = "./static";
 
-        for(;;) {
+        while(srv) {
             mg_mgr_poll(&mgr, 1000);
         }
 
         mg_mgr_free(&mgr);
         cleanup();
+
+        exit(130);
     } else {
+        mode = 1;
         play_stream(argv[1]);
         cleanup();
     }
