@@ -1,22 +1,29 @@
-#include "../mongoose/mongoose.h"
+#include "mongoose/mongoose.h"
 #include <ao/ao.h>
 #include <curl/curl.h>
 #include <math.h>
 #include <mpg123.h>
 #include <mrss.h>
 #include <signal.h>
+#include <string.h>
+#include <sqlite3.h>
 
 #define TPOD_MODE_SRV 0
 #define TPOD_MODE_CLI 1
 
 static struct mg_serve_http_opts s_http_server_opts;
+static const struct mg_str msg_http_method_get = MG_MK_STR("GET");
+static const struct mg_str msg_http_method_post = MG_MK_STR("POST");
 
-mpg123_handle *mh = NULL;
-ao_device *device = NULL;
+sqlite3 *db;
+mpg123_handle *mh;
+ao_device *device;
 
 int playback_stop = 0;
 int srv = 1; // keep mongoose event loop running
 int mode = TPOD_MODE_SRV;
+
+char ** select_podcasts(int *);
 
 size_t write_callback(char *delivered_data, size_t size, size_t nmemb, void *user_data) {
     int err;
@@ -103,6 +110,21 @@ static void handle_stop(struct mg_connection *con, struct http_message *msg) {
     playback_stop = 1;
 }
 
+static void handle_init(struct mg_connection *con, struct http_message *msg) {
+    mg_printf(con, "%s", "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n");
+    mg_send_http_chunk(con, "", 0);
+}
+
+int tpod_mg_str_cmp(const struct mg_str *sample_str, const struct mg_str *test_str){
+  return sample_str->len == test_str->len && memcmp(sample_str->p, test_str->p, sample_str->len) == 0;
+}
+
+char ** tokenize_string(const char *string, const char *delimiter){
+  char **tokens;
+
+  return tokens;
+}
+
 static void ev_handler(struct mg_connection *con, int ev, void *ev_data) {
     struct http_message *msg = (struct http_message *) ev_data;
 
@@ -113,6 +135,28 @@ static void ev_handler(struct mg_connection *con, int ev, void *ev_data) {
             }
             else if(mg_vcmp(&msg->uri, "/stop") == 0) {
                 handle_stop(con, msg);
+            }
+            else if(mg_vcmp(&msg->uri, "/init") == 0) {
+              if(tpod_mg_str_cmp(&msg->method, &msg_http_method_get)){
+                /* char query_string[msg->query_string.len + 1]; */
+                /* strncpy(query_string, msg->query_string.p, msg->query_string.len); */
+                int i;
+                int podcasts_num;
+                char *res = NULL;
+                char **podcasts = select_podcasts(&podcasts_num);
+
+                for(i=0; i<podcasts_num; i++){
+                  res = realloc(res, (sizeof(res) + strlen(podcasts[i])) * sizeof(char));
+                  /* sprintf(res, "%s,%s", res, podcasts[i]); */
+                  sprintf(res, "%s", podcasts[i]);
+                  free(podcasts[i]);
+                }
+
+                free(podcasts);
+                printf("here\n");
+                printf("%s\n", res);
+                mg_printf(con, "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", (int)strlen(res), res);
+              }
             }
             else {
                 mg_serve_http(con, msg, s_http_server_opts);
@@ -125,6 +169,7 @@ static void ev_handler(struct mg_connection *con, int ev, void *ev_data) {
 
 
 void cleanup() {
+    sqlite3_close(db);
     playback_stop = 1;
     ao_shutdown();
     mpg123_exit();
@@ -147,10 +192,44 @@ void signal_handler(int s) {
     }
 }
 
+char ** select_podcasts(int *podcasts_num) {
+  char **podcasts_tmp = NULL;
+  *podcasts_num = 0;
+  sqlite3_stmt *stmt;
+  int i;
+
+
+  if(sqlite3_prepare_v2(db, "select uri from podcasts", -1, &stmt, NULL) != SQLITE_OK){
+    printf("failed to prepare statement: %s\n", sqlite3_errmsg(db));
+    sqlite3_close(db);
+    cleanup();
+  }
+
+  for(i=0; sqlite3_step(stmt) == SQLITE_ROW; i++) {
+    const char *podcast_str = sqlite3_column_text(stmt, 0);
+    int podcast_len = strlen(sqlite3_column_text(stmt, 0));
+
+    podcasts_tmp = realloc(podcasts_tmp, (sizeof(podcasts_tmp) + 1) * sizeof(char *));
+    podcasts_tmp[i] = malloc(podcast_len * sizeof(char));
+    strcpy(podcasts_tmp[i], podcast_str);
+    *podcasts_num += 1;
+  }
+
+  sqlite3_finalize(stmt);
+  return podcasts_tmp;
+}
+
 int main(int argc, char **argv) {
     signal(SIGINT, signal_handler);
 
+    if(sqlite3_open("tpod.db", &db) != SQLITE_OK){
+      printf("failed to open database: %s\n", sqlite3_errmsg(db));
+      cleanup();
+      return 1;
+    }
+
     mpg123_init();
+
     ao_initialize();
 
     if(strcmp("-s", argv[1]) == 0) {
@@ -201,6 +280,8 @@ int main(int argc, char **argv) {
         }
         mrss_free(feed);
     }
+    /* else if(strcmp("-x", argv[1]) == 0){ */
+    /* } */
     else {
         mode = 1;
         play_stream(argv[1]);

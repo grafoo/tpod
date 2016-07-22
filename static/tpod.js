@@ -3,7 +3,7 @@ function init() {
     $.ajax({
         url: '/init',
         method: 'GET',
-        dataType: 'json',
+      data: {foo: "bar", baz: "bla"},
         success: function(res) {
             console.log(res);
         }
