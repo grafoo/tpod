@@ -7,6 +7,7 @@
 #include <signal.h>
 #include <string.h>
 #include <sqlite3.h>
+#include <jansson.h>
 
 #define TPOD_MODE_SRV 0
 #define TPOD_MODE_CLI 1
@@ -142,20 +143,24 @@ static void ev_handler(struct mg_connection *con, int ev, void *ev_data) {
                 /* strncpy(query_string, msg->query_string.p, msg->query_string.len); */
                 int i;
                 int podcasts_num;
-                char *res = NULL;
+                /* char *res = NULL; */
                 char **podcasts = select_podcasts(&podcasts_num);
+                json_t *j_podcast_obj = json_object();
+                json_t *j_podcast_arr = json_array();
 
                 for(i=0; i<podcasts_num; i++){
-                  res = realloc(res, (sizeof(res) + strlen(podcasts[i])) * sizeof(char));
-                  /* sprintf(res, "%s,%s", res, podcasts[i]); */
-                  sprintf(res, "%s", podcasts[i]);
+                  /* res = realloc(res, (sizeof(res) + strlen(podcasts[i])) * sizeof(char)); */
+                  /* /\* sprintf(res, "%s,%s", res, podcasts[i]); *\/ */
+                  /* sprintf(res, "%s", podcasts[i]); */
+                  json_array_append_new(j_podcast_arr, json_string(podcasts[i]));
                   free(podcasts[i]);
                 }
 
                 free(podcasts);
-                printf("here\n");
-                printf("%s\n", res);
-                mg_printf(con, "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", (int)strlen(res), res);
+                json_object_set_new(j_podcast_obj, "podcasts", j_podcast_arr);
+                char *s_podcasts_obj = json_dumps(j_podcast_obj, JSON_COMPACT);
+                printf("%s\n", s_podcasts_obj);
+                mg_printf(con, "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: %d\r\n\r\n%s", (int)strlen(s_podcasts_obj), s_podcasts_obj);
               }
             }
             else {
