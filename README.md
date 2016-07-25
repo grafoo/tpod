@@ -26,12 +26,17 @@ sudo xbps-install -S \
 ```
 
 ### debian
+```
 sudo apt-get install \
     gcc \
     libao-dev \
     libcurl4-nss-dev \
+    libjansson-dev \
     libmpg123-dev \
+    libmrss0-dev \
+    libsqlite0-dev \
     make
+```
 
 # todo
 - investigate why mongoose-devel won't work
