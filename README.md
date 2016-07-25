@@ -34,7 +34,7 @@ sudo apt-get install \
     libjansson-dev \
     libmpg123-dev \
     libmrss0-dev \
-    libsqlite0-dev \
+    libsqlite3-dev \
     make
 ```
 

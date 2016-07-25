@@ -1,11 +1,16 @@
-// not implemented on backend yet
 function init() {
     $.ajax({
         url: '/init',
         method: 'GET',
-      data: {foo: "bar", baz: "bla"},
+        dataType: 'json',
         success: function(res) {
-            console.log(res);
+            var podcast;
+            var podcasts = document.getElementById('podcasts');
+            for(podcast of res.podcasts) {
+                var newPodcast = document.createElement('div');
+                newPodcast.innerHTML = podcast;
+                podcasts.appendChild(newPodcast);
+            }
         }
     });
 }

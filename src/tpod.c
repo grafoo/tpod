@@ -143,15 +143,11 @@ static void ev_handler(struct mg_connection *con, int ev, void *ev_data) {
                 /* strncpy(query_string, msg->query_string.p, msg->query_string.len); */
                 int i;
                 int podcasts_num;
-                /* char *res = NULL; */
                 char **podcasts = select_podcasts(&podcasts_num);
                 json_t *j_podcast_obj = json_object();
                 json_t *j_podcast_arr = json_array();
 
                 for(i=0; i<podcasts_num; i++){
-                  /* res = realloc(res, (sizeof(res) + strlen(podcasts[i])) * sizeof(char)); */
-                  /* /\* sprintf(res, "%s,%s", res, podcasts[i]); *\/ */
-                  /* sprintf(res, "%s", podcasts[i]); */
                   json_array_append_new(j_podcast_arr, json_string(podcasts[i]));
                   free(podcasts[i]);
                 }
