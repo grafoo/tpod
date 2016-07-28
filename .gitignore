@@ -31,3 +31,10 @@
 # Debug files
 *.dSYM/
 *.su
+
+# tpod
+tpod
+dep/
+
+# scons
+.sconsign.dblite
