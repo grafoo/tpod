@@ -1,5 +1,5 @@
 # tpod
-a tiny podcast fetcher/player
+the tiny podcatcher
 
 # dependencies
 - libao
@@ -35,20 +35,22 @@ sudo apt-get install \
     libmpg123-dev \
     libmrss0-dev \
     libsqlite3-dev \
-    make
+    make \
+    sqlite3
 ```
 
 ### opensuse
 ```
 sudo zypper addrepo http://download.opensuse.org/repositories/devel:/libraries:/c_c++/openSUSE_Factory/devel:libraries:c_c++.repo # needed for libmrss
 sudo zypper refresh
-sudo zypper install libmrss-devel \
+sudo zypper install \
     alsa-devel \
     libao-devel \
-    sqlite3-devel \
     libjansson-devel \
+    libmrss-devel \
+    scons # makes it easier to include non package mpg123 \
     sqlite3 # for interacting with the database \
-    scons # makes it easier to include non package mpg123
+    sqlite3-devel
 ```
 it seems that there is now standard package for mpg123, so this needs to be built manually.
 the source can be found on e.g. `https://www.mpg123.de/download/mpg123-1.23.6.tar.bz2`
