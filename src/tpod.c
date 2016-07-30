@@ -24,7 +24,58 @@ int playback_stop = 0;
 int srv = 1; // keep mongoose event loop running
 int mode = TPOD_MODE_SRV;
 
-char ** select_podcasts(int *);
+char **tokenize_string(const char *string, const char *delimiter);
+char **select_podcasts(int *);
+char *load_episodes();
+
+/* todo: save podcast episodes to db rather than loading them every time */
+char *load_episodes() {
+  int i;
+  int podcast_uris_num;
+  char **podcast_uris = select_podcasts(&podcast_uris_num);
+
+  mrss_t *feed;
+  mrss_item_t *episode;
+  mrss_tag_t *other_tags;
+
+  json_t *jsn_podcasts_obj = json_object();
+  json_t *jsn_podcasts_arr = json_array();
+ 
+  for(i=0; i<podcast_uris_num; i++) {
+    mrss_parse_url_with_options_and_error(podcast_uris[i], &feed, NULL, NULL);
+    json_t *jsn_podcast_obj = json_object();
+    json_object_set_new(jsn_podcast_obj, "title", json_string(feed->title));
+    json_t *jsn_episodes_arr = json_array();
+    episode = feed->item;
+    while(episode) {
+      json_t *jsn_episode_obj = json_object();
+      json_object_set_new(jsn_episode_obj, "title", json_string(episode->title));
+      json_object_set_new(jsn_episode_obj, "description", json_string(episode->description));
+      json_object_set_new(jsn_episode_obj, "stream_uri", json_string(episode->enclosure_url));
+      if(episode->other_tags){
+        other_tags = episode->other_tags;
+        while(other_tags){
+          if(strcmp(other_tags->name, "duration") == 0) {
+            json_object_set_new(jsn_episode_obj, "duration", json_string(other_tags->value));
+          }
+          other_tags = other_tags->next;
+        }
+      }
+      episode = episode->next;
+      json_array_append_new(jsn_episodes_arr, jsn_episode_obj);
+    }
+    mrss_free(feed);
+    json_object_set_new(jsn_podcast_obj, "episodes", jsn_episodes_arr);
+    json_array_append_new(jsn_podcasts_arr, jsn_podcast_obj);
+    free(podcast_uris[i]);
+  }
+ 
+  free(podcast_uris);
+
+  json_object_set_new(jsn_podcasts_obj, "podcasts", jsn_podcasts_arr);
+
+  return json_dumps(jsn_podcasts_obj, JSON_COMPACT);
+}
 
 size_t write_callback(char *delivered_data, size_t size, size_t nmemb, void *user_data) {
     int err;
@@ -111,61 +162,38 @@ static void handle_stop(struct mg_connection *con, struct http_message *msg) {
     playback_stop = 1;
 }
 
-static void handle_init(struct mg_connection *con, struct http_message *msg) {
-    mg_printf(con, "%s", "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n");
-    mg_send_http_chunk(con, "", 0);
-}
-
 int tpod_mg_str_cmp(const struct mg_str *sample_str, const struct mg_str *test_str){
   return sample_str->len == test_str->len && memcmp(sample_str->p, test_str->p, sample_str->len) == 0;
 }
 
-char ** tokenize_string(const char *string, const char *delimiter){
-  char **tokens;
-
-  return tokens;
-}
-
 static void ev_handler(struct mg_connection *con, int ev, void *ev_data) {
-    struct http_message *msg = (struct http_message *) ev_data;
+  struct http_message *msg = (struct http_message *) ev_data;
 
-    switch(ev) {
-        case MG_EV_HTTP_REQUEST:
-            if(mg_vcmp(&msg->uri, "/play") == 0) {
-                handle_play(con, msg);
-            }
-            else if(mg_vcmp(&msg->uri, "/stop") == 0) {
-                handle_stop(con, msg);
-            }
-            else if(mg_vcmp(&msg->uri, "/init") == 0) {
-              if(tpod_mg_str_cmp(&msg->method, &msg_http_method_get)){
-                /* char query_string[msg->query_string.len + 1]; */
-                /* strncpy(query_string, msg->query_string.p, msg->query_string.len); */
-                int i;
-                int podcasts_num;
-                char **podcasts = select_podcasts(&podcasts_num);
-                json_t *j_podcast_obj = json_object();
-                json_t *j_podcast_arr = json_array();
+  switch(ev) {
+    case MG_EV_HTTP_REQUEST:
+      if(mg_vcmp(&msg->uri, "/play") == 0) {
+        handle_play(con, msg);
+      }
+      else if(mg_vcmp(&msg->uri, "/stop") == 0) {
+        handle_stop(con, msg);
+      }
+      else if(mg_vcmp(&msg->uri, "/init") == 0) {
+        if(tpod_mg_str_cmp(&msg->method, &msg_http_method_get)){
+          /* char query_string[msg->query_string.len + 1]; */
+          /* strncpy(query_string, msg->query_string.p, msg->query_string.len); */
 
-                for(i=0; i<podcasts_num; i++){
-                  json_array_append_new(j_podcast_arr, json_string(podcasts[i]));
-                  free(podcasts[i]);
-                }
+          char *jsnstr_podcasts_obj = load_episodes();
 
-                free(podcasts);
-                json_object_set_new(j_podcast_obj, "podcasts", j_podcast_arr);
-                char *s_podcasts_obj = json_dumps(j_podcast_obj, JSON_COMPACT);
-                printf("%s\n", s_podcasts_obj);
-                mg_printf(con, "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: %d\r\n\r\n%s", (int)strlen(s_podcasts_obj), s_podcasts_obj);
-              }
-            }
-            else {
-                mg_serve_http(con, msg, s_http_server_opts);
-            }
-            break;
-        default:
-            break;
-    }
+          mg_printf(con, "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: %d\r\n\r\n%s", (int)strlen(jsnstr_podcasts_obj), jsnstr_podcasts_obj);
+        }
+      }
+      else {
+        mg_serve_http(con, msg, s_http_server_opts);
+      }
+      break;
+    default:
+      break;
+  }
 }
 
 
@@ -193,7 +221,7 @@ void signal_handler(int s) {
     }
 }
 
-char ** select_podcasts(int *podcasts_num) {
+char **select_podcasts(int *podcasts_num) {
   char **podcasts_tmp = NULL;
   *podcasts_num = 0;
   sqlite3_stmt *stmt;

@@ -1,16 +1,19 @@
 <!DOCTYPE html>
 <html>
-    <head>
-        <meta charset="UTF-8">
-        <script src="//code.jquery.com/jquery-1.11.0.min.js"></script>
-        <script src="tpod.js"></script>
-    </head>
-    <body onLoad="init();">
-        <div>
-            <input id="streamURI" type="text" />
-            <button id="playStream" onclick="playStream()">play</button>
-            <button id="stopStream" onclick="stopStream()">stop</button>
-        </div>
-        <div id="podcasts"></div>
-    </body>
+  <head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" type="text/css" href="tpod.css">
+    <script src="//code.jquery.com/jquery-1.11.0.min.js"></script>
+    <script src="tpod.js"></script>
+  </head>
+  <body onLoad="init();">
+    <button id="stopStream" onclick="stopStream()">stop</button>
+
+    <div>
+      <input id="streamURI" type="text" />
+      <button id="playStream" onclick="playStream()">play</button>
+    </div>
+
+    <div id="podcasts"></div>
+  </body>
 </html>
