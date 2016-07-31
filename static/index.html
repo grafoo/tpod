@@ -7,13 +7,15 @@
     <script src="tpod.js"></script>
   </head>
   <body onLoad="init();">
-    <button id="stopStream" onclick="stopStream()">stop</button>
+    <div class="center">
+      <button id="stopStream" onclick="stopStream()">stop</button>
 
-    <div>
-      <input id="streamURI" type="text" />
-      <button id="playStream" onclick="playStream()">play</button>
+      <div>
+        <input id="streamURI" type="text" />
+        <button id="playStream" onclick="playEpisode()">play</button>
+      </div>
+
+      <div id="podcasts"></div>
     </div>
-
-    <div id="podcasts"></div>
   </body>
 </html>

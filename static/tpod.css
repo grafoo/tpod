@@ -3,3 +3,8 @@
   top: 2%;
   right: 5%;
 }
+
+.center {
+  margin: auto;
+  width: 50%;
+}

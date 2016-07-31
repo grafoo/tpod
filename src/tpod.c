@@ -24,9 +24,13 @@ int playback_stop = 0;
 int srv = 1; // keep mongoose event loop running
 int mode = TPOD_MODE_SRV;
 
+int test_counter = 0;
+char test_buffer[18000];
+
 char **tokenize_string(const char *string, const char *delimiter);
 char **select_podcasts(int *);
 char *load_episodes();
+static size_t header_callback(char *buffer, size_t size, size_t nitems, void *userdata);
 
 /* todo: save podcast episodes to db rather than loading them every time */
 char *load_episodes() {
@@ -151,8 +155,7 @@ void play_stream(char *stream_uri) {
 static void handle_play(struct mg_connection *con, struct http_message *msg) {
     char stream_uri[200];
     mg_get_http_var(&msg->body, "streamURI", stream_uri, sizeof(stream_uri));
-    mg_printf(con, "%s", "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n");
-    mg_send_http_chunk(con, "", 0);
+    mg_printf(con, "%s", "HTTP/1.1 200 OK\r\nConnection: close\r\n\r\n");
     play_stream(stream_uri);
 }
 
@@ -248,6 +251,51 @@ char **select_podcasts(int *podcasts_num) {
   return podcasts_tmp;
 }
 
+int test_progress_callback(void *client, double down_total, double down_now, double up_total, double up_now) {
+    if(test_counter >= 18000) {
+        return 1;
+    }
+
+    /* printf("total: %d, now: %d\n", down_total, down_now); */
+
+    return 0;
+}
+
+static size_t header_callback(char *buffer, size_t size, size_t nitems, void *userdata) {
+  /* received header is nitems * size long in 'buffer' NOT ZERO TERMINATED */
+  /* 'userdata' is set with CURLOPT_HEADERDATA */
+  /* printf("size: %ld, ", size * sizeof(long)); */
+  if(memcmp("icy-metaint:", buffer, 12) == 0) {
+
+  printf("num: %ld, ", nitems);
+  printf("text: %s\n", buffer);
+    
+  }
+
+  return nitems * size;
+}
+
+static size_t test_write_callback(char *buffer, size_t size, size_t nchars, void *userdata) {
+  /* test_buffer = realloc(test_buffer, (sizeof(test_buffer) + nchars) * sizeof(char *)); */
+  strcat(test_buffer, buffer);
+  test_counter += (size * nchars);
+    printf("%d\n", test_counter);
+  /* if(test_counter >= 16000){ */
+  /*   printf("%d\n", test_counter); */
+  /*   int i; */
+  /*   for(i=16000; i<16256; i++){ */
+  /*     printf("%s", test_buffer[i]); */
+  /*   } */
+  /*   test_counter = 0; */
+  /* } */
+  /* printf("test_counter: %d\n", test_counter); */
+  /* if( (test_counter % 16000) == 0 ) { */
+  /*   printf("%s\n", buffer); */
+  /*   test_counter = 0; */
+  /* } */
+  return nchars * size;
+}
+
 int main(int argc, char **argv) {
     signal(SIGINT, signal_handler);
 
@@ -285,32 +333,73 @@ int main(int argc, char **argv) {
         mrss_item_t *episode;
         mrss_tag_t *other_tags;
         mrss_parse_url_with_options_and_error(argv[2], &feed, NULL, NULL);
-        printf("%s\n", feed->title);
-        printf("%s\n", feed->link);
-        printf("%s\n", feed->description);
-        printf("%s\n", feed->pubDate);
-        printf("%s\n", feed->lastBuildDate);
+        printf("title: %s\n", feed->title);
+        printf("link: %s\n", feed->link);
+        /* printf("description: %s\n", feed->description); */
+        printf("pub-data: %s\n", feed->pubDate);
+        /* printf("%s\n", feed->lastBuildDate); */
+        printf("---\n");
         episode = feed->item;
+
+    char month[4];
+    int day, year;
         while(episode) {
-            printf("%s\n", episode->title);
-            printf("%s\n", episode->link);
-            printf("%s\n", episode->description);
-            printf("%s\n", episode->enclosure_url);
+            printf("title: %s\n", episode->title);
+
+            /**
+             episode->pubDate is formated like e.g. Sat, 30 Jul 2016 00:00:00 +0200
+             when parsing the datetime string only year, month and day will be used
+             */
+            /* sscanf(episode->pubDate, "%*s %d %s %d %*d:%*d:%*d %*s", &day, month, &year); */
+            printf("%d %s %d\n", day, month, year );
+            printf("pud-date: %d %s %d\n", year, month, day);
+            /* printf("%s\n", episode->link); */
+            printf("description: %s\n", episode->description);
+            printf("stream uri: %s\n", episode->enclosure_url);
             if(episode->other_tags){
                 other_tags = episode->other_tags;
                 while(other_tags){
-                    if(strcmp(other_tags->name, "duration") == 0) {
-                        printf("%s\n", other_tags->value);
-                    }
+                    /* if(strcmp(other_tags->name, "duration") == 0) { */
+                    /*     printf("%s\n", other_tags->value); */
+                    /* } */
+                  printf("other :: %s: %s\n", other_tags->name, other_tags->value);
                     other_tags = other_tags->next;
                 }
             }
+        printf("\n");
             episode = episode->next;
         }
         mrss_free(feed);
     }
-    /* else if(strcmp("-x", argv[1]) == 0){ */
-    /* } */
+    else if(strcmp("-x", argv[1]) == 0) {
+        CURL *ch = NULL;
+        struct curl_slist *headers = NULL;
+
+        ch = curl_easy_init();
+        if(ch) {
+          headers = curl_slist_append(headers, "Icy-MetaData: 1");
+          curl_easy_setopt(ch, CURLOPT_HTTPHEADER, headers);
+            curl_easy_setopt(ch, CURLOPT_URL, argv[2]);
+            curl_easy_setopt(ch, CURLOPT_FOLLOWLOCATION, 1L);
+            curl_easy_setopt(ch, CURLOPT_WRITEFUNCTION, test_write_callback);
+            curl_easy_setopt(ch, CURLOPT_PROGRESSFUNCTION, test_progress_callback);
+            curl_easy_setopt(ch, CURLOPT_NOPROGRESS, 0L); // make curl use the progress_callback
+            curl_easy_setopt(ch, CURLOPT_HEADERFUNCTION, header_callback);
+
+            curl_easy_perform(ch);
+            curl_slist_free_all(headers);
+            curl_easy_cleanup(ch);
+
+            int i;
+    for(i=16000; i<16256; i++){
+      printf("%c", test_buffer[i]);
+    }
+    printf("%s\n", test_buffer);
+    char foo[16000];
+    memcpy(foo, test_buffer + 16000, 255);
+    printf("%s\n", foo);
+        }
+    }
     else {
         mode = 1;
         play_stream(argv[1]);
@@ -319,3 +408,4 @@ int main(int argc, char **argv) {
 
     return 0;
 }
+

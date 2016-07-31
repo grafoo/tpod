@@ -35,14 +35,16 @@ function init() {
 }
 
 function playEpisode(uri) {
-  $.ajax({
-    url:'/play',
-    method: 'POST',
-    data: {streamURI: uri}
-  });
+  if(uri === undefined) {
+    uri = document.getElementById('streamURI').value;
+  }
+  var httpReq = new XMLHttpRequest();
+  httpReq.open('POST', '/play', true);
+  httpReq.send('streamURI=' + uri);
 }
 
 function playStream() {
+  console.log(streamURI);
   $.ajax({
     url: '/play',
     method: 'POST',
