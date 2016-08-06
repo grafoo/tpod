@@ -8,7 +8,10 @@
   </head>
   <body onLoad="init();">
     <div class="center">
-      <button id="stopStream" onclick="stopStream()">stop</button>
+      <div class="mediaButtons">
+        <button id="stopStream" onclick="stopStream()">stop</button>
+        <button id="pauseStream" onclick="pauseStream()">pause</button>
+      </div>
 
       <div>
         <input id="streamURI" type="text" />

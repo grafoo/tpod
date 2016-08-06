@@ -61,3 +61,12 @@ function stopStream() {
     data: {},
   });
 }
+
+function pauseStream() {
+  $.ajax({
+    url: '/pause',
+    method: 'POST',
+    dataType: 'json',
+    data: {},
+  });
+}

@@ -66,6 +66,8 @@ LD_LIBRARY_PATH=./dep/lib64/ ./tpod -s
 # todo
 - investigate why mongoose-devel won't work
 - update debian dependencies
+- test flexbox for css ( https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Flexible_Box_Layout/Using_CSS_flexible_boxes )
+
 
 # bugs
 - when sending sigint while playback is running libao will leave the fd of alsa in a bad state
